@@ -16,7 +16,8 @@ module EX(
     ///ÐÂÔö
     output wire [`EX_TO_ID_WD-1:0] ex_to_id_bus,
     //12-9
-    output wire isLS
+    output wire isLS,
+    output wire stallreq_for_ex
 );
 
     reg [`ID_TO_EX_WD-1:0] id_to_ex_bus_r;
@@ -88,11 +89,12 @@ module EX(
     assign ex_result = alu_result;
     //12-8
     assign data_sram_en = data_ram_en;
-    assign data_sram_wen = data_ram_wen;
+    assign data_sram_wen = data_ram_wen;   
     assign data_sram_addr = alu_result;
-    assign data_sram_wdata = (data_ram_wen == 4'b1111) ? rf_rdata2:32'b0;
+    assign data_sram_wdata = rf_rdata2;
     //12-10
-    assign isLS=(inst[31:26]==6'b10_0011);
+    assign isLS=(inst[31:26]==6'b10_0011)?1'b1:1'b0;  
+    assign stallreq_for_ex = `NoStop;
     
     assign ex_to_mem_bus = {
         ex_pc,          // 75:44
