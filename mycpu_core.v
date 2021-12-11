@@ -32,7 +32,11 @@ module mycpu_core(
     //新增
     wire [`EX_TO_ID_WD-1:0] ex_to_id_bus;
     wire [`MEM_TO_ID_WD-1:0] mem_to_id_bus;
-    //wire [`WB_TO_ID_WD-1:0] wb_to_id_bus;
+    wire [`WB_TO_ID_WD-1:0] wb_to_id_bus;
+    //12-9
+    wire stallreq_from_id;
+    //12-10
+    wire isLS;
 
     IF u_IF(
     	.clk             (clk             ),
@@ -51,7 +55,8 @@ module mycpu_core(
     	.clk             (clk             ),
         .rst             (rst             ),
         .stall           (stall           ),
-        .stallreq        (stallreq        ),
+        //
+        .stallreq_from_id        (stallreq_from_id),
         .if_to_id_bus    (if_to_id_bus    ),
         .inst_sram_rdata (inst_sram_rdata ),
         .wb_to_rf_bus    (wb_to_rf_bus    ),
@@ -59,8 +64,10 @@ module mycpu_core(
         .br_bus          (br_bus          ),
         //新增
         .ex_to_id_bus    (ex_to_id_bus    ),
-        .mem_to_id_bus   (mem_to_id_bus   )
-        //.wb_to_id_bus    (wb_to_id_bus    )
+        .mem_to_id_bus   (mem_to_id_bus   ),
+        .wb_to_id_bus    (wb_to_id_bus    ),
+        //12-10
+        .isLS(isLS)
     );
 
     EX u_EX(
@@ -74,7 +81,9 @@ module mycpu_core(
         .data_sram_addr  (data_sram_addr  ),
         .data_sram_wdata (data_sram_wdata ),
         //新增
-        .ex_to_id_bus    (ex_to_id_bus    )
+        .ex_to_id_bus    (ex_to_id_bus    ),
+        //12-10
+        .isLS(isLS)
     );
 
     MEM u_MEM(
@@ -97,12 +106,13 @@ module mycpu_core(
         .debug_wb_pc       (debug_wb_pc       ),
         .debug_wb_rf_wen   (debug_wb_rf_wen   ),
         .debug_wb_rf_wnum  (debug_wb_rf_wnum  ),
-        .debug_wb_rf_wdata (debug_wb_rf_wdata )
+        .debug_wb_rf_wdata (debug_wb_rf_wdata ),
         //新增
-        //.wb_to_id_bus      (wb_to_id_bus      )
+        .wb_to_id_bus      (wb_to_id_bus      )
     );
 
     CTRL u_CTRL(
+        .stallreq_from_id(stallreq_from_id),
     	.rst   (rst   ),
         .stall (stall )
     );
