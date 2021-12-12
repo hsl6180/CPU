@@ -17,7 +17,9 @@ module EX(
     output wire [`EX_TO_ID_WD-1:0] ex_to_id_bus,
     //12-9
     output wire isLS,
-    output wire stallreq_for_ex
+    output wire stallreq_from_ex,
+    output wire div_ready_to_id
+    //output wire stallreq_for_ex
 );
 
     reg [`ID_TO_EX_WD-1:0] id_to_ex_bus_r;
@@ -48,11 +50,29 @@ module EX(
     wire sel_rf_res;
     wire [31:0] rf_rdata1, rf_rdata2;
     reg is_in_delayslot;
-
+    wire hi_we;         //LL
+    wire lo_we;         //LL
+    wire [31:0] hi_ex; //LL
+    wire [31:0] lo_ex; //LL
+    wire if_mul;        //LL
+    wire if_div;        //LL
+    wire [31:0] hi_out_id;         //LL
+    wire [31:0] lo_out_id;         //LL
+    wire hi_read; //LL
+    wire lo_read; //LL
+    wire hi_write;//LL
+    wire lo_write;//LL
+    
     assign {
-        ex_pc,          // 148:117
-        inst,           // 116:85
-        alu_op,         // 84:83
+        hi_write,
+        lo_write,
+        hi_read,
+        lo_read,
+        hi_out_id, //LL
+        lo_out_id, //LL
+        ex_pc,          // 158:127
+        inst,           // 126:95
+        alu_op,         // 94:83
         sel_alu_src1,   // 82:80
         sel_alu_src2,   // 79:76
         data_ram_en,    // 75
@@ -86,52 +106,56 @@ module EX(
         .alu_result  (alu_result  )
     );
 
-    assign ex_result = alu_result;
+    assign ex_result =  hi_read ? hi_out_id:
+                        lo_read ? lo_out_id:
+                        alu_result;
     //12-8
     assign data_sram_en = data_ram_en;
     assign data_sram_wen = data_ram_wen;   
-    assign data_sram_addr = alu_result;
+    assign data_sram_addr = ex_result;
     assign data_sram_wdata = rf_rdata2;
     //12-10
     assign isLS=(inst[31:26]==6'b10_0011)?1'b1:1'b0;  
     assign stallreq_for_ex = `NoStop;
     
-    assign ex_to_mem_bus = {
-        ex_pc,          // 75:44
-        data_ram_en,    // 43
-        data_ram_wen,   // 42:39
-        sel_rf_res,     // 38
-        rf_we,          // 37
-        rf_waddr,       // 36:32
-        ex_result       // 31:0
-    };
-    //新增
-    assign ex_to_id_bus={
-        rf_we,
-        rf_waddr,
-        ex_result
-    };
+    
+    
         
     // MUL part
+    wire inst_mult;                             //LL
+    wire inst_multu;                            //LL
+    assign inst_mult    = inst[31:26]==6'b00_0000&inst[15:6]==10'b00000_00000&inst[5:0]==6'b01_1000;        //LL
+    assign inst_multu   = inst[31:26]==6'b00_0000&inst[15:6]==10'b00000_00000&inst[5:0]==6'b01_1001;        //LL
     wire [63:0] mul_result;
     wire mul_signed; // 有符号乘法标记
+    assign mul_signed = inst_mult;          //LL
+    assign if_mul=inst_mult | inst_multu;   //LL
+    wire [31:0] rf_rdata_mul1;              //LL
+    wire [31:0] rf_rdata_mul2;              //LL
+    assign rf_rdata_mul1 = (if_mul) ? rf_rdata1 : 32'd0 ;  //LL
+    assign rf_rdata_mul2 = (if_mul) ? rf_rdata2 : 32'd0 ;  //LL                    
 
     mul u_mul(
     	.clk        (clk            ),
         .resetn     (~rst           ),
         .mul_signed (mul_signed     ),
-        .ina        (      ), // 乘法源操作数1
-        .inb        (      ), // 乘法源操作数2
-        .result     (mul_result     ) // 乘法结果 64bit
+        .ina        ( rf_rdata_mul1     ), // 乘法源操作数1
+        .inb        ( rf_rdata_mul2     ), // 乘法源操作数2
+        .result     (mul_result     ) // 乘法结果64bit
     );
 
     // DIV part
     wire [63:0] div_result;
-    wire inst_div, inst_divu;
+    wire inst_div, inst_divu;           //LL
+    assign inst_div    = inst[31:26]==6'b00_0000&inst[15:6]==10'b00000_00000&inst[5:0]==6'b01_1010;//LL
+    assign inst_divu   = inst[31:26]==6'b00_0000&inst[15:6]==10'b00000_00000&inst[5:0]==6'b01_1011;//LL
     wire div_ready_i;
-    reg stallreq_for_div;
-    assign stallreq_for_ex = stallreq_for_div;
-
+ //   reg stallreq_for_div;
+ //   assign stallreq_for_ex = stallreq_for_div;
+    assign if_div=inst_div|inst_divu;   //LL
+    
+    assign stallreq_from_ex = (if_div) & div_ready_i==1'b0;
+    assign div_ready_to_id = div_ready_i;
     reg [31:0] div_opdata1_o;
     reg [31:0] div_opdata2_o;
     reg div_start_o;
@@ -146,19 +170,21 @@ module EX(
         .start_i      (div_start_o      ),
         .annul_i      (1'b0      ),
         .result_o     (div_result     ), // 除法结果 64bit
-        .ready_o      (div_ready_i      )
+        .ready_o      (div_ready_i    )
     );
+    
+    
 
     always @ (*) begin
         if (rst) begin
-            stallreq_for_div = `NoStop;
+           // stallreq_for_div = `NoStop;
             div_opdata1_o = `ZeroWord;
             div_opdata2_o = `ZeroWord;
             div_start_o = `DivStop;
             signed_div_o = 1'b0;
         end
         else begin
-            stallreq_for_div = `NoStop;
+           // stallreq_for_div = `NoStop;
             div_opdata1_o = `ZeroWord;
             div_opdata2_o = `ZeroWord;
             div_start_o = `DivStop;
@@ -170,21 +196,21 @@ module EX(
                         div_opdata2_o = rf_rdata2;
                         div_start_o = `DivStart;
                         signed_div_o = 1'b1;
-                        stallreq_for_div = `Stop;
+                        //stallreq_for_div = `Stop;
                     end
                     else if (div_ready_i == `DivResultReady) begin
                         div_opdata1_o = rf_rdata1;
                         div_opdata2_o = rf_rdata2;
                         div_start_o = `DivStop;
                         signed_div_o = 1'b1;
-                        stallreq_for_div = `NoStop;
+                       // stallreq_for_div = `NoStop;
                     end
                     else begin
                         div_opdata1_o = `ZeroWord;
                         div_opdata2_o = `ZeroWord;
                         div_start_o = `DivStop;
                         signed_div_o = 1'b0;
-                        stallreq_for_div = `NoStop;
+                       // stallreq_for_div = `NoStop;
                     end
                 end
                 2'b01:begin
@@ -193,21 +219,21 @@ module EX(
                         div_opdata2_o = rf_rdata2;
                         div_start_o = `DivStart;
                         signed_div_o = 1'b0;
-                        stallreq_for_div = `Stop;
+                        //stallreq_for_div = `Stop;
                     end
                     else if (div_ready_i == `DivResultReady) begin
                         div_opdata1_o = rf_rdata1;
                         div_opdata2_o = rf_rdata2;
                         div_start_o = `DivStop;
                         signed_div_o = 1'b0;
-                        stallreq_for_div = `NoStop;
+                        //stallreq_for_div = `NoStop;
                     end
                     else begin
                         div_opdata1_o = `ZeroWord;
                         div_opdata2_o = `ZeroWord;
                         div_start_o = `DivStop;
                         signed_div_o = 1'b0;
-                        stallreq_for_div = `NoStop;
+                        //stallreq_for_div = `NoStop;
                     end
                 end
                 default:begin
@@ -217,5 +243,44 @@ module EX(
     end
 
     // mul_result 和 div_result 可以直接使用
+    
+    
+    //LL
+     assign hi_ex = (if_mul)? mul_result[63:32]:
+                    (if_div)?div_result[63:32]:
+                    (hi_write)? rf_rdata1:
+                     32'b0;
+                  
+     assign lo_ex= (if_mul)? mul_result[31:0]:
+                   (if_div)?div_result[31:0]:
+                   (lo_write)? rf_rdata1:
+                    32'b0;
+                   
+    assign hi_we=inst_div|inst_divu|inst_mult|inst_multu|hi_write;//LL
+    assign lo_we=inst_div|inst_divu|inst_mult|inst_multu|lo_write;//LL
+    
+    assign ex_to_mem_bus = {
+        hi_we,                    //LL
+        lo_we,                    //LL
+        hi_ex,                    //LL
+        lo_ex,                    //LL
+        ex_pc,          // 75:44
+        data_ram_en,    // 43
+        data_ram_wen,   // 42:39
+        sel_rf_res,     // 38
+        rf_we,          // 37
+        rf_waddr,       // 36:32
+        ex_result       // 31:0
+    };
+    //新增
+    assign ex_to_id_bus={
+        rf_we,
+        rf_waddr,
+        ex_result,
+        hi_we,                    //LL
+        lo_we,                    //LL
+        hi_ex,                    //LL
+        lo_ex                     //LL
+    };
     
 endmodule

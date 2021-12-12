@@ -35,8 +35,10 @@ module mycpu_core(
     wire [`WB_TO_ID_WD-1:0] wb_to_id_bus;
     //12-9
     wire stallreq_from_id;
+    wire stallreq_from_ex;      //LL
     //12-10
     wire isLS;
+    wire div_ready_to_id;
 
     IF u_IF(
     	.clk             (clk             ),
@@ -67,7 +69,8 @@ module mycpu_core(
         .mem_to_id_bus   (mem_to_id_bus   ),
         .wb_to_id_bus    (wb_to_id_bus    ),
         //12-10
-        .isLS(isLS)
+        .isLS(isLS),
+        .div_ready_to_id(div_ready_to_id)   //LL
     );
 
     EX u_EX(
@@ -83,7 +86,9 @@ module mycpu_core(
         //ÐÂÔö
         .ex_to_id_bus    (ex_to_id_bus    ),
         //12-10
-        .isLS(isLS)
+        .isLS(isLS),
+        .stallreq_from_ex(stallreq_from_ex),//LL
+        .div_ready_to_id(div_ready_to_id)   //LL
     );
 
     MEM u_MEM(
@@ -113,6 +118,7 @@ module mycpu_core(
 
     CTRL u_CTRL(
         .stallreq_from_id(stallreq_from_id),
+        .stallreq_from_ex(stallreq_from_ex),//LL
     	.rst   (rst   ),
         .stall (stall )
     );
