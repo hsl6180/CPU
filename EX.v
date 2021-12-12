@@ -45,6 +45,7 @@ module EX(
     wire [3:0] sel_alu_src2;
     wire data_ram_en;
     wire [3:0] data_ram_wen;
+    wire [3:0] data_ram_readen;//LL
     wire rf_we;
     wire [4:0] rf_waddr;
     wire sel_rf_res;
@@ -64,12 +65,13 @@ module EX(
     wire lo_write;//LL
     
     assign {
-        hi_write,
-        lo_write,
-        hi_read,
-        lo_read,
-        hi_out_id, //LL
-        lo_out_id, //LL
+        data_ram_readen,  //LL
+        hi_write,         //LL
+        lo_write,         //LL
+        hi_read,          //LL
+        lo_read,          //LL
+        hi_out_id,        //LL
+        lo_out_id,        //LL
         ex_pc,          // 158:127
         inst,           // 126:95
         alu_op,         // 94:83
@@ -109,11 +111,11 @@ module EX(
     assign ex_result =  hi_read ? hi_out_id:
                         lo_read ? lo_out_id:
                         alu_result;
-    //12-8
-    assign data_sram_en = data_ram_en;
-    assign data_sram_wen = data_ram_wen;   
-    assign data_sram_addr = ex_result;
-    assign data_sram_wdata = rf_rdata2;
+    //12-8 
+    
+    
+                            
+                            
     //12-10
     assign isLS=(inst[31:26]==6'b10_0011)?1'b1:1'b0;  
     assign stallreq_for_ex = `NoStop;
@@ -260,10 +262,11 @@ module EX(
     assign lo_we=inst_div|inst_divu|inst_mult|inst_multu|lo_write;//LL
     
     assign ex_to_mem_bus = {
+        data_ram_readen,            //LL 3
         hi_we,                    //LL
         lo_we,                    //LL
-        hi_ex,                    //LL
-        lo_ex,                    //LL
+        hi_ex,                    //LL存回HI寄存器的值
+        lo_ex,                    //LL存回LO寄存器的值
         ex_pc,          // 75:44
         data_ram_en,    // 43
         data_ram_wen,   // 42:39
@@ -283,4 +286,24 @@ module EX(
         lo_ex                     //LL
     };
     
+    //LL
+    //assign data_sram_wdata = rf_rdata2;
+    assign data_sram_en = data_ram_en;
+    assign data_sram_wen =   (data_ram_readen==4'b0101 && ex_result[1:0] == 2'b00 )? 4'b0001 
+                            :(data_ram_readen==4'b0101 && ex_result[1:0] == 2'b01 )? 4'b0010
+                            :(data_ram_readen==4'b0101 && ex_result[1:0] == 2'b10 )? 4'b0100
+                            :(data_ram_readen==4'b0101 && ex_result[1:0] == 2'b11 )? 4'b1000
+                            :(data_ram_readen==4'b0111 && ex_result[1:0] == 2'b00 )? 4'b0011
+                            :(data_ram_readen==4'b0111 && ex_result[1:0] == 2'b10 )? 4'b1100
+                            : data_ram_wen;//写使能信号        
+    assign data_sram_addr = ex_result;  //内存的地址
+    assign data_sram_wdata = data_sram_wen==4'b1111 ? rf_rdata2 
+                            :data_sram_wen==4'b0001 ? {24'b0,rf_rdata2[7:0]}
+                            :data_sram_wen==4'b0010 ? {16'b0,rf_rdata2[7:0],8'b0}
+                            :data_sram_wen==4'b0100 ? {8'b0,rf_rdata2[7:0],16'b0}
+                            :data_sram_wen==4'b1000 ? {rf_rdata2[7:0],24'b0}
+                            :data_sram_wen==4'b0011 ? {16'b0,rf_rdata2[15:0]}
+                            :data_sram_wen==4'b1100 ? {rf_rdata2[15:0],16'b0}
+                            :32'b0;
+                            
 endmodule

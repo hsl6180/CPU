@@ -84,14 +84,14 @@ module regfile(
                     (mem_id_hi_we)? mem_id_hi_i:
                     (wb_id_hi_we) ? wb_id_hi_i:
                     (hi_read) ? hi_out:
-                    32'b0; 
+                    reg_hi; 
                     
     //LL read lo_out          
     assign lo_out = (ex_id_lo_we) ? ex_id_lo_i:
                     (mem_id_lo_we)? mem_id_lo_i:
                     (wb_id_lo_we) ? wb_id_lo_i:
                     (lo_read) ? lo_out:
-                    32'b0; 
+                    reg_lo; 
                     
    // LL    
     assign out = (hi_read)?hi_out:
