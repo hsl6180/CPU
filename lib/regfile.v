@@ -83,14 +83,14 @@ module regfile(
     assign hi_out = (ex_id_hi_we) ? ex_id_hi_i:
                     (mem_id_hi_we)? mem_id_hi_i:
                     (wb_id_hi_we) ? wb_id_hi_i:
-                    (hi_read) ? hi_out:
+           //         (hi_read) ? hi_out:
                     reg_hi; 
                     
     //LL read lo_out          
     assign lo_out = (ex_id_lo_we) ? ex_id_lo_i:
                     (mem_id_lo_we)? mem_id_lo_i:
                     (wb_id_lo_we) ? wb_id_lo_i:
-                    (lo_read) ? lo_out:
+          //          (lo_read) ? lo_out:
                     reg_lo; 
                     
    // LL    

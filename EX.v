@@ -118,7 +118,7 @@ module EX(
                             
     //12-10
     assign isLS=(inst[31:26]==6'b10_0011)?1'b1:1'b0;  
-    assign stallreq_for_ex = `NoStop;
+    //assign stallreq_for_ex = `NoStop;
     
     
     

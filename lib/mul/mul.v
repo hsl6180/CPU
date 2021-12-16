@@ -37,7 +37,7 @@ module mul (
   assign ext_inb = {mul_signed & inb[31], inb};
     
   //decoder
-  assign code[ 0][0] = ext_ina[ 1] & ext_ina[ 0];
+  assign code[ 0][0] =  ext_ina[ 1] & ext_ina[ 0];
   assign code[ 1][0] = (ext_ina[ 1] & ext_ina[ 2] & ~ext_ina[ 3]) + (ext_ina[ 1] & ~ext_ina[ 2] & ext_ina[ 3]) + (~ext_ina[ 1] & ext_ina[ 2] & ext_ina[ 3]);
   assign code[ 2][0] = (ext_ina[ 3] & ext_ina[ 4] & ~ext_ina[ 5]) + (ext_ina[ 3] & ~ext_ina[ 4] & ext_ina[ 5]) + (~ext_ina[ 3] & ext_ina[ 4] & ext_ina[ 5]);
   assign code[ 3][0] = (ext_ina[ 5] & ext_ina[ 6] & ~ext_ina[ 7]) + (ext_ina[ 5] & ~ext_ina[ 6] & ext_ina[ 7]) + (~ext_ina[ 5] & ext_ina[ 6] & ext_ina[ 7]);
