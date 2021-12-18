@@ -121,30 +121,119 @@ module EX(
     //assign stallreq_for_ex = `NoStop;
     
     
-    
-        
-    // MUL part
+//    // MUL part
+//    wire inst_mult;                             //LL
+//    wire inst_multu;                            //LL
+//    assign inst_mult    = inst[31:26]==6'b00_0000&inst[15:6]==10'b00000_00000&inst[5:0]==6'b01_1000;        //LL
+//    assign inst_multu   = inst[31:26]==6'b00_0000&inst[15:6]==10'b00000_00000&inst[5:0]==6'b01_1001;        //LL
+//    wire [63:0] mul_result;
+//    wire mul_signed; // 有符号乘法标记
+//    assign mul_signed = inst_mult;          //LL
+//    assign if_mul=inst_mult | inst_multu;   //LL
+//    wire [31:0] rf_rdata_mul1;              //LL
+//    wire [31:0] rf_rdata_mul2;              //LL
+//    assign rf_rdata_mul1 = (if_mul) ? rf_rdata1 : 32'd0 ;  //LL
+//    assign rf_rdata_mul2 = (if_mul) ? rf_rdata2 : 32'd0 ;  //LL                    
+
+//    mul u_mul(
+//    	.clk        (clk            ),
+//        .resetn     (~rst           ),
+//        .mul_signed (mul_signed     ),
+//        .ina        ( rf_rdata_mul1     ), // 乘法源操作数1
+//        .inb        ( rf_rdata_mul2     ), // 乘法源操作数2
+//        .result     (mul_result     ) // 乘法结果64bit
+//    );
+
+    //MUL part
+    reg stallreq_for_mul;
+    wire mul_ready_i;
+    reg signed_mul_o; //是否是有符号乘法
+    reg [31:0] mul_opdata1_o;
+    reg [31:0] mul_opdata2_o;
+    reg mul_start_o;
     wire inst_mult;                             //LL
     wire inst_multu;                            //LL
     assign inst_mult    = inst[31:26]==6'b00_0000&inst[15:6]==10'b00000_00000&inst[5:0]==6'b01_1000;        //LL
     assign inst_multu   = inst[31:26]==6'b00_0000&inst[15:6]==10'b00000_00000&inst[5:0]==6'b01_1001;        //LL
+    assign if_mul=inst_mult | inst_multu;       //LL     
     wire [63:0] mul_result;
-    wire mul_signed; // 有符号乘法标记
-    assign mul_signed = inst_mult;          //LL
-    assign if_mul=inst_mult | inst_multu;   //LL
-    wire [31:0] rf_rdata_mul1;              //LL
-    wire [31:0] rf_rdata_mul2;              //LL
-    assign rf_rdata_mul1 = (if_mul) ? rf_rdata1 : 32'd0 ;  //LL
-    assign rf_rdata_mul2 = (if_mul) ? rf_rdata2 : 32'd0 ;  //LL                    
-
-    mul u_mul(
-    	.clk        (clk            ),
-        .resetn     (~rst           ),
-        .mul_signed (mul_signed     ),
-        .ina        ( rf_rdata_mul1     ), // 乘法源操作数1
-        .inb        ( rf_rdata_mul2     ), // 乘法源操作数2
-        .result     (mul_result     ) // 乘法结果64bit
+    my_mul mymul(
+        .rst            (rst            ),
+	    .clk            (clk            ),
+	    .signed_mul_i   (signed_mul_o   ),
+	    .muldata1_i     (mul_opdata1_o  ),//被乘数
+	    .muldata2_i     (mul_opdata2_o  ),//乘数
+	    .start_i        (mul_start_o    ),
+	    .annul_i      (1'b0      ),
+	    .result_o       (mul_result     ),
+	    .ready_o        (mul_ready_i    )
     );
+    always @ (*) begin
+        if (rst) begin
+            stallreq_for_mul = `NoStop;
+            mul_opdata1_o = `ZeroWord;
+            mul_opdata2_o = `ZeroWord;
+            mul_start_o = `MulStop;
+            signed_mul_o = 1'b0;
+        end
+        else begin
+            stallreq_for_mul = `NoStop;
+            mul_opdata1_o = `ZeroWord;
+            mul_opdata2_o = `ZeroWord;
+            mul_start_o = `MulStop;
+            signed_mul_o = 1'b0;
+            case ({inst_mult,inst_multu})
+                2'b10:begin
+                    if (mul_ready_i == `MulResultNotReady) begin
+                        mul_opdata1_o = rf_rdata1;
+                        mul_opdata2_o = rf_rdata2;
+                        mul_start_o = `MulStart;
+                        signed_mul_o = 1'b1;
+                        stallreq_for_mul = `Stop;
+                    end
+                    else if (mul_ready_i == `MulResultReady) begin
+                        mul_opdata1_o = rf_rdata1;
+                        mul_opdata2_o = rf_rdata2;
+                        mul_start_o = `MulStop;
+                        signed_mul_o = 1'b1;
+                        stallreq_for_mul = `NoStop;
+                    end
+                    else begin
+                        mul_opdata1_o = `ZeroWord;
+                        mul_opdata2_o = `ZeroWord;
+                        mul_start_o = `MulStop;
+                        signed_mul_o = 1'b0;
+                        stallreq_for_mul = `NoStop;
+                    end
+                end
+                2'b01:begin
+                    if (mul_ready_i == `MulResultNotReady) begin
+                        mul_opdata1_o = rf_rdata1;
+                        mul_opdata2_o = rf_rdata2;
+                        mul_start_o = `MulStart;
+                        signed_mul_o = 1'b0;
+                        stallreq_for_mul = `Stop;
+                    end
+                    else if (mul_ready_i == `MulResultReady) begin
+                        mul_opdata1_o = rf_rdata1;
+                        mul_opdata2_o = rf_rdata2;
+                        mul_start_o = `MulStop;
+                        signed_mul_o = 1'b0;
+                        stallreq_for_mul = `NoStop;
+                    end
+                    else begin
+                        mul_opdata1_o = `ZeroWord;
+                        mul_opdata2_o = `ZeroWord;
+                        mul_start_o = `MulStop;
+                        signed_mul_o = 1'b0;
+                        stallreq_for_mul = `NoStop;
+                    end
+                end
+                default:begin
+                end
+            endcase
+        end
+    end
 
     // DIV part
     wire [63:0] div_result;
@@ -155,8 +244,7 @@ module EX(
  //   reg stallreq_for_div;
  //   assign stallreq_for_ex = stallreq_for_div;
     assign if_div=inst_div|inst_divu;   //LL
-    
-    assign stallreq_from_ex = (if_div) & div_ready_i==1'b0;
+    assign stallreq_from_ex = (if_div) & div_ready_i==1'b0|(if_mul) & mul_ready_i==1'b0;
     assign div_ready_to_id = div_ready_i;
     reg [31:0] div_opdata1_o;
     reg [31:0] div_opdata2_o;
@@ -248,12 +336,12 @@ module EX(
     
     
     //LL
-     assign hi_ex = (if_mul)? mul_result[63:32]:
+    assign hi_ex =  (if_mul)?mul_result[63:32]:
                     (if_div)?div_result[63:32]:
                     (hi_write)? rf_rdata1:
                      32'b0;
                   
-     assign lo_ex= (if_mul)? mul_result[31:0]:
+     assign lo_ex= (if_mul)?mul_result[31:0]:
                    (if_div)?div_result[31:0]:
                    (lo_write)? rf_rdata1:
                     32'b0;
@@ -262,7 +350,7 @@ module EX(
     assign lo_we=inst_div|inst_divu|inst_mult|inst_multu|lo_write;//LL
     
     assign ex_to_mem_bus = {
-        data_ram_readen,            //LL 3
+        data_ram_readen,          //LL 3
         hi_we,                    //LL
         lo_we,                    //LL
         hi_ex,                    //LL存回HI寄存器的值
