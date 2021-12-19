@@ -164,7 +164,7 @@ module EX(
 	    .muldata1_i     (mul_opdata1_o  ),//±»³ËÊý
 	    .muldata2_i     (mul_opdata2_o  ),//³ËÊý
 	    .start_i        (mul_start_o    ),
-	    .annul_i      (1'b0      ),
+	    .annul_i        (1'b0           ),
 	    .result_o       (mul_result     ),
 	    .ready_o        (mul_ready_i    )
     );
@@ -244,8 +244,8 @@ module EX(
  //   reg stallreq_for_div;
  //   assign stallreq_for_ex = stallreq_for_div;
     assign if_div=inst_div|inst_divu;   //LL
-    assign stallreq_from_ex = (if_div) & div_ready_i==1'b0|(if_mul) & mul_ready_i==1'b0;
-    assign div_ready_to_id = div_ready_i;
+    assign stallreq_from_ex = ((if_div) & div_ready_i==1'b0)|((if_mul) & mul_ready_i==1'b0);
+    assign div_ready_to_id = div_ready_i|mul_ready_i;
     reg [31:0] div_opdata1_o;
     reg [31:0] div_opdata2_o;
     reg div_start_o;
