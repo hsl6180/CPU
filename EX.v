@@ -63,8 +63,12 @@ module EX(
     wire lo_read; //LL
     wire hi_write;//LL
     wire lo_write;//LL
+    wire inst_lsa;
+    wire [4:0] sa;
     
     assign {
+        inst_lsa,
+        sa,
         data_ram_readen,  //LL
         hi_write,         //LL
         lo_write,         //LL
@@ -85,6 +89,8 @@ module EX(
         rf_rdata1,         // 63:32
         rf_rdata2          // 31:0
     } = id_to_ex_bus_r;
+    wire [31:0] lsaresult;
+    assign lsaresult=(rf_rdata1<<(sa[1:0]+3'b001))+rf_rdata2;
 
     wire [31:0] imm_sign_extend, imm_zero_extend, sa_zero_extend;
     assign imm_sign_extend = {{16{inst[15]}},inst[15:0]};
@@ -110,6 +116,7 @@ module EX(
 
     assign ex_result =  hi_read ? hi_out_id:
                         lo_read ? lo_out_id:
+                        inst_lsa?lsaresult:
                         alu_result;
     //12-8 
     
@@ -164,7 +171,7 @@ module EX(
 	    .muldata1_i     (mul_opdata1_o  ),//±»³ËÊý
 	    .muldata2_i     (mul_opdata2_o  ),//³ËÊý
 	    .start_i        (mul_start_o    ),
-	    .annul_i        (1'b0           ),
+	    .annul_i      (1'b0      ),
 	    .result_o       (mul_result     ),
 	    .ready_o        (mul_ready_i    )
     );
@@ -244,8 +251,8 @@ module EX(
  //   reg stallreq_for_div;
  //   assign stallreq_for_ex = stallreq_for_div;
     assign if_div=inst_div|inst_divu;   //LL
-    assign stallreq_from_ex = ((if_div) & div_ready_i==1'b0)|((if_mul) & mul_ready_i==1'b0);
-    assign div_ready_to_id = div_ready_i|mul_ready_i;
+    assign stallreq_from_ex = (if_div) & div_ready_i==1'b0|(if_mul) & mul_ready_i==1'b0;
+    assign div_ready_to_id = div_ready_i;
     reg [31:0] div_opdata1_o;
     reg [31:0] div_opdata2_o;
     reg div_start_o;
@@ -267,7 +274,7 @@ module EX(
 
     always @ (*) begin
         if (rst) begin
-           // stallreq_for_div = `NoStop;
+           //stallreq_for_div = `NoStop;
             div_opdata1_o = `ZeroWord;
             div_opdata2_o = `ZeroWord;
             div_start_o = `DivStop;
